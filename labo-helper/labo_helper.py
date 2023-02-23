@@ -9,7 +9,8 @@ import time
 import datetime
 
 class InstrumentException(Exception):
-    pass
+    def __init__(self, msg):
+        pass
 
 def assert_ch(channel):
     assert channel in (1, 2), "No existe el canal {}".format(channel)
@@ -27,15 +28,20 @@ def unpack_8bit(bitfield_8):
     return result
 
 class Logger:
-    def __init__(self, save_path = ""):
-        self._initial_time = time.time()
+
+    _initial_time = None
+    _log = []
+
+    def __init__(self, logfile = None):
+        if Logger._initial_time == None:
+            Logger._initial_time = time.time()
         self._log = []
-        self._save_path = save_path
-        if save_path != "":
+        self._save_path = logfile
+        if logfile != None:
             self.file = open(self._save_path, "w")
 
     def get_time(self):
-        time_str = str(datetime.timedelta(seconds=time.time()-self._initial_time))
+        time_str = str(datetime.timedelta(seconds=time.time()-Logger._initial_time))
         if time_str.find(".") != -1:
             time_str=time_str[:time_str.find(".")]
         return time_str
@@ -76,12 +82,12 @@ class Logger:
         self._log.append(msg+"\n")
 
     def __del__(self):
-        if self._save_path != "":
+        if self._save_path != None:
             for msg in self._log:
                 self.file.write(msg)
 
 class Osciloscope:
-    def __init__(self, rm : pv.ResourceManager, keystring, exact_match = False, logger = None):
+    def __init__(self, rm : pv.ResourceManager, keystring, exact_match = False, logfile = None):
         self.possible_voltaje_scales = np.array(('0.002','0.005','0.01','0.02','0.05','0.1',
                                                  '0.2',  '0.5',  '1.0', '2.0', '5.0'))
         self.possible_time_scales = np.array(('5e-09','1e-08', '2.5e-08','5e-08', '1e-07','2.5e-07',
@@ -89,10 +95,7 @@ class Osciloscope:
                                               '5e-05','0.0001','0.00025','0.0005','0.001','0.0025',
                                               '0.005','0.01',  '0.025',  '0.05',  '0.1',  '0.25',
                                               '0.5',  '1.0',   '2.5',    '5.0',   '10.0', '25.0','50.0'))
-        if logger == None:
-            self._logger = Logger()
-        else:
-            self._logger = logger
+        self._logger = Logger(logfile=logfile)
         ls = rm.list_resources()
         for s in ls:
             if s == keystring or (keystring in s and exact_match == False):
@@ -186,6 +189,7 @@ class Osciloscope:
     def set_trigger_source(self, channel):
         assert_ch(channel)
         self._inst.write("TRIG:MAI:EDGE:SOU CH{}".format(channel))
+        self.error_check("Error al cambiar la fuente del trigger a CH{}".format(channel))
 
     def set_trigger_slope(self, raise_fall):
         if raise_fall in ("raise", True, 1):
@@ -227,26 +231,32 @@ class Osciloscope:
         else:
             scale = find_closest(self.possible_voltaje_scales, scale)
         self._inst.write("CH{}:SCA {}".format(channel, scale))
-        if self.error_check():
-            self._logger.error("Error al cambiar la escala del canal {} del osciloscopio".format(channel), "")
+        try:
+            self.error_check("Error al cambiar la escala del canal {} del osciloscopio".format(channel))
+        except:
+            raise InstrumentException()
         else:
             self.current_voltaje_scale[channel] = scale
-            self._logger.message("Escala del canal {} del osciloscopio fijado en {}".format(channel, scale))
+            self._logger.message("{} Escala del canal {} del osciloscopio fijado en {}".format(self._name, channel, scale))
 
     def set_voltaje_offset(self, channel, offset):
         assert_ch(channel)
         self._inst.write("CH{}:POS {}".format(channel, offset))
-        if self.error_check():
-            self._logger.error("Error al cambiar el offset del canal {} del osciloscopio".format(channel), "")
+        try:
+            self.error_check("Error al cambiar el offset del canal {} del osciloscopio".format(channel))
+        except:
+            raise InstrumentException()
         else:
             self.current_voltaje_offset[channel] = offset
-            self._logger.message("Offset del canal {} del osciloscopio fijado en {}".format(channel, scale))
+            self._logger.message("{} Offset del canal {} del osciloscopio fijado en {}".format(self._name, channel, scale))
 
     def autoset(self):
         self._inst.write("AUTOSET EXECUTE")
         self._inst.query("*OPC?")
-        if self.error_check():
-            self._logger.error("Error al ejecutar el autoset", "")
+        try:
+            self.error_check("Error al ejecutar el autoset")
+        except:
+            raise InstrumentException()
         self.update_state()
 
     def aquire_data(self, root_dir_path):
@@ -277,8 +287,8 @@ class Osciloscope:
                         voltaje_scale = float(self._inst.query("WFMP:YMULT"))
                         voltaje_zero = float(self._inst.query("WFMP:YZERO"))
                         voltaje_offset = float(self._inst.query("WFMP:YOFF"))
-                        if self.error_check() == True:
-                            raise
+                        self._inst.query("*OPC?")
+                        self.error_check("Error al medir")
                         # escribimos la configuracion del osciloscopio en el archivo de configuracion
                         file.write(" ENABLED\n")
                         file.write("time_increment {}\n".format(time_increment))
@@ -300,7 +310,7 @@ class Osciloscope:
                 plt.savefig(dir_path+"figure.pdf")
                 plt.clf()
             except:
-                self._logger.error("Medicion fallida", "")
+                raise InstrumentException()
             else:
                 self._logger.success("Medicion exitosa", "Datos guardados en {}".format(dir_path))
 
