@@ -202,11 +202,15 @@ class Osciloscope:
         self._inst.write("TRIG:MAI:EDGE:SLO {}".format(str))
         self.error_check("Error al cambiar la pendiente del trigger")
 
+    def set_trigger_level(self, level):
+        self._inst.write("TRIG:MAI:LEV {}".format(level))
+        self.error_check("Error al cambiar el nivel del trigger a {}V".format(level))
+
     def set_time_scale(self, scale, index_input = False):
         if index_input:
             scale = self.possible_time_scales[scale]
         else:
-            scale = find_closest(self.possible_time_scales, scale)
+            scale = find_closest(self.possible_time_scales, float(scale))
         self._inst.write("HOR:MAI:SCA {}".format(scale))
         try: 
             self.error_check("Error al cambiar la escala de tiempo del osciloscopio")
@@ -229,7 +233,7 @@ class Osciloscope:
         if index_input:
             scale = self.possible_voltaje_scales[scale]
         else:
-            scale = find_closest(self.possible_voltaje_scales, scale)
+            scale = find_closest(self.possible_voltaje_scales, float(scale))
         self._inst.write("CH{}:SCA {}".format(channel, scale))
         try:
             self.error_check("Error al cambiar la escala del canal {} del osciloscopio".format(channel))
@@ -366,7 +370,7 @@ class FunctionGenerator:
         self.current_offset[channel] = offset
         self._logger.message("{} Offset DC del canal {} fijado a {}".format(self._name, channel, offset))
 
-    def set_output_state(self, channel, output_state):
+    def toggle_channel(self, channel, output_state):
         assert_ch(channel)
         if output_state:
             on_off = "ON"
@@ -378,4 +382,3 @@ class FunctionGenerator:
 
 rm = pv.ResourceManager()
 osc = Osciloscope(rm, "ASRL3:")
-

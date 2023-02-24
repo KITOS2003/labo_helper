@@ -28,7 +28,7 @@ import pyvisa
 pyvisa.ResourceManager().list_resources() # NOTA: si usas un backend distinto tenelo en cuenta
 ```
 
-El output de eso deberia darte una lista de los nombres que pyvisa le da a los instrumentos conectados, identifica que nombres corresponden a los instrumentos conectados. Para establecer la conexion podes usar el nombre completo de los instrumentos pero tambien podes usar un pedazo que los identifique de manera inequivoca, por ejemplo si se tiene [ INST::LINDO::4629, INST::FEO::7621 ], "LINDO" y "FEO" basta para identificar a los instrumentos
+El output de eso deberia darte una lista de los nombres que pyvisa le da a los instrumentos conectados, identifica que nombres corresponden a cada uno de los instrumentos a utilizar. Para establecer la conexion podes usar el nombre completo de los instrumentos pero tambien podes usar un pedazo que los identifique de manera inequivoca, por ejemplo si se tiene [ INST::LINDO::4629, INST::FEO::7621 ], "LINDO" y "FEO" basta para identificar a los instrumentos
 
 Luego en el script en el que quieras escribir tu rutina de medicion empeza por escribir:
 
@@ -50,7 +50,9 @@ Ej. Barrido de frecuencias sencillo:
 ```python
 fg.set_shape(1, "SIN") # Que el canal 1 del generador emita sinusoidales
 fg.set_voltaje(1, 5.0) # Que el canal 1 del generador emita 5Vpp
-fg.set_output_state(1, True) # Encender el canal 1
+fg.toggle_channel(1, True) # Encender el canal 1 del generador
+osc.toggle_channel(1, True)  # Encender el canal 1 del osciloscopio
+osc.set_trigger_source(1)    # Triggerear con el canal 1
 
 import numpy as np
 frecuencias = np.linspace(0, 1000, 100)
