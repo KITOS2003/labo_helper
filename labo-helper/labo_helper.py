@@ -88,13 +88,13 @@ class Logger:
 
 class Osciloscope:
     def __init__(self, rm : pv.ResourceManager, keystring, exact_match = False, logfile = None):
-        self.possible_voltaje_scales = np.array(('0.002','0.005','0.01','0.02','0.05','0.1',
-                                                 '0.2',  '0.5',  '1.0', '2.0', '5.0'))
-        self.possible_time_scales = np.array(('5e-09','1e-08', '2.5e-08','5e-08', '1e-07','2.5e-07',
-                                              '5e-07','1e-06', '2.5e-06','5e-06', '1e-05','2.5e-05',
-                                              '5e-05','0.0001','0.00025','0.0005','0.001','0.0025',
-                                              '0.005','0.01',  '0.025',  '0.05',  '0.1',  '0.25',
-                                              '0.5',  '1.0',   '2.5',    '5.0',   '10.0', '25.0','50.0'))
+        self.possible_voltaje_scales = np.array((0.002,0.005,0.01,0.02,0.05,0.1,
+                                                 0.2,  0.5,  1.0, 2.0, 5.0))
+        self.possible_time_scales = np.array((5e-09,1e-08, 2.5e-08,5e-08, 1e-07,2.5e-07,
+                                              5e-07,1e-06, 2.5e-06,5e-06, 1e-05,2.5e-05,
+                                              5e-05,0.0001,0.00025,0.0005,0.001,0.0025,
+                                              0.005,0.01,  0.025,  0.05,  0.1,  0.25,
+                                              0.5,  1.0,   2.5,    5.0,   10.0, 25.0,50.0))
         self._logger = Logger(logfile=logfile)
         ls = rm.list_resources()
         for s in ls:
@@ -108,8 +108,8 @@ class Osciloscope:
             return None
         else:
             self._idn = self._inst.query("*IDN?")
-            self.osc.write('DAT:ENC RPB')
-            self.osc.write('DAT:WID 1')
+            self._inst.write('DAT:ENC RPB')
+            self._inst.write('DAT:WID 1')
             self.current_time_scale = 0
             self.current_time_offset = 0
             self.current_voltaje_scale = [ None, 0, 0 ]
@@ -125,14 +125,15 @@ class Osciloscope:
     def __str__(self, error_msg):
         print(self._name + "\n" + self._idn)
 
-    def error_check(self):
-        error = int(self._inst.query("*ESR?"))
-        error = unpack_8bit(error_list)[2:6]
-        if any(error) == True:
-            self._logger.error(self._name+" "+error_msg, "")
-            error_msg = self._inst.query("ALLEV?")
-            self._logger.error("LOG DEL OSCILOSCOPIO:", error_msg)
-            raise InstrumentException()
+    def error_check(self, error_msg):
+        pass
+        # error = int(self._inst.query("*ESR?"))
+        # error = unpack_8bit(error)[2:6]
+        # if any(error) == True:
+        #     self._logger.error(self._name+" "+error_msg, "")
+        #     error_msg = self._inst.query("ALLEV?")
+        #     self._logger.error("LOG DEL OSCILOSCOPIO:", error_msg)
+        #     raise InstrumentException("")
 
     def update_state(self):
         """Obtener la configuracion actual del osciloscopio y actualizar las variables internas"""
@@ -141,14 +142,14 @@ class Osciloscope:
         for i in range(1, 3):
             self.current_voltaje_scale[i] = float(self._inst.query("CH{}:SCA?".format(i)))
             self.current_voltaje_offset[i] = float(self._inst.query("CH{}:POS?".format(i)))
-            if self._inst.query("SELECT:CH{}?".format(i)) in [ "1", "ON" ]:
+            if self._inst.query("SELECT:CH{}?".format(i)) in [ "1\n", "ON\n" ]:
                 self.current_channel_enabled[i] = True
             else:
                 self.current_channel_enabled[i] = False
         mode = self._inst.query("ACQ:MODE?")
-        if mode == "SAMPLE":
+        if mode == "SAMPLE\n":
             self.current_average_sample_number = 1
-        elif mode == "AVERAGE":
+        elif mode == "AVERAGE\n":
             self.current_average_sample_number = int(self._inst.query("ACQ:NUMAVG?"))
         else:
             raise InstrumentException("El osciloscopio se encuentra en modo raro")
@@ -215,7 +216,7 @@ class Osciloscope:
         try: 
             self.error_check("Error al cambiar la escala de tiempo del osciloscopio")
         except:
-            raise InstrumentException()
+            raise InstrumentException("")
         else:
             self.current_time_scale = scale
             self._logger.message("{} Escala temporal del osciloscopio fijada en {}".format(self._name, scale))
@@ -238,7 +239,7 @@ class Osciloscope:
         try:
             self.error_check("Error al cambiar la escala del canal {} del osciloscopio".format(channel))
         except:
-            raise InstrumentException()
+            raise InstrumentException("")
         else:
             self.current_voltaje_scale[channel] = scale
             self._logger.message("{} Escala del canal {} del osciloscopio fijado en {}".format(self._name, channel, scale))
@@ -249,7 +250,7 @@ class Osciloscope:
         try:
             self.error_check("Error al cambiar el offset del canal {} del osciloscopio".format(channel))
         except:
-            raise InstrumentException()
+            raise InstrumentException("")
         else:
             self.current_voltaje_offset[channel] = offset
             self._logger.message("{} Offset del canal {} del osciloscopio fijado en {}".format(self._name, channel, scale))
@@ -260,18 +261,24 @@ class Osciloscope:
         try:
             self.error_check("Error al ejecutar el autoset")
         except:
-            raise InstrumentException()
+            raise InstrumentException("")
         self.update_state()
 
     def aquire_data(self, root_dir_path):
         dir_index = 0
         while True:
-            dir_path = root_dir_path+"osc_measurement_{}/".format(dir_index)
-            if os.path.isdir(dir_path):
-                continue
-            else:
+            dir_path = root_dir_path+"/osc_measurement_{}/".format(dir_index)
+            if not os.path.isdir(dir_path):
                 break
-        os.mkdir(dir_path)
+            dir_index += 1
+        try:
+            os.mkdir(root_dir_path)
+        except:
+            pass
+        try:
+            os.mkdir(dir_path)
+        except:
+            pass
         plt.figure(1)
         plt.grid("on")
         plt.xlabel("Tiempo [s]")
@@ -280,18 +287,24 @@ class Osciloscope:
             try:
                 self._logger.message("Leyendo datos del osciloscopio...")
                 for i in [1, 2]:
-                    file.write("----------------------------------\nCHANNEL {}:".fotmat(i))
-                    if current_channel_enabled[i]:
+                    file.write("----------------------------------\nCHANNEL {}:".format(i))
+                    if self.current_channel_enabled[i]:
                         # Indicamos de que canal queremos extraer los datos
                         self._inst.write("DAT:SOU CH{}".format(i))
                         # extraemos los datos
-                        data = self.query_binary_values("CURV?", datatype="B", container=np.array)
+                        data = self._inst.query_binary_values("CURV?", datatype="B", container=np.array)
+                        print(data)
                         time_increment  = float(self._inst.query("WFMP:XINCR"))
+                        print(time_increment)
                         time_zero = float(self._inst.query("WFMP:XZERO"))
+                        print(time_zero)
                         voltaje_scale = float(self._inst.query("WFMP:YMULT"))
+                        print(voltaje_scale)
                         voltaje_zero = float(self._inst.query("WFMP:YZERO"))
+                        print(voltaje_zero)
                         voltaje_offset = float(self._inst.query("WFMP:YOFF"))
-                        self._inst.query("*OPC?")
+                        print(voltaje_offset)
+                        # self._inst.query("*OPC?")
                         self.error_check("Error al medir")
                         # escribimos la configuracion del osciloscopio en el archivo de configuracion
                         file.write(" ENABLED\n")
@@ -314,7 +327,7 @@ class Osciloscope:
                 plt.savefig(dir_path+"figure.pdf")
                 plt.clf()
             except:
-                raise InstrumentException()
+                raise InstrumentException("")
             else:
                 self._logger.success("Medicion exitosa", "Datos guardados en {}".format(dir_path))
 
@@ -341,10 +354,19 @@ class FunctionGenerator:
         self.current_shape = [ None, "", "" ]
         self.current_frequency = [ None, 0, 0 ]
         self.current_voltaje = [ None, 0, 0 ]
-        self.current_output_state = [ None, False, False ]
         self.current_offset = [ None, 0 , 0 ]
+        self.current_channel_enabled = [ None, False, False ]
         self.shapes = [ 'SIN', 'SQU', 'RAMP' ]
         self.update_state()
+
+    def update_state(self):
+        for channel in [1, 2]:
+            self.current_shape[channel] = self._inst.query("SOUR{}:FUNC:SHAP?".format(channel))
+            self.current_frequency[channel] = self._inst.query("SOUR{}:FREQ?".format(channel))
+            self.current_voltaje[channel] = self._inst.query("SOUR{}:VOLT?".format(channel))
+            self.current_voltaje[channel] = self._inst.query("SOUR{}:VOLT?".format(channel))
+            self.current_offset[channel] = self._inst.query("SOUR{}:VOLT:OFFS?".format(channel))
+            self.current_channel_enabled[channel] = self._inst.query("OUTP{}:STAT?".format(channel))
             
     def set_shape(self, channel, shape):
         assert_ch(channel)
@@ -377,8 +399,10 @@ class FunctionGenerator:
         else:
             on_off = "OFF"
         self._inst.write("OUTP{}:STAT {}".format(channel, on_off))
-        self.current_output_state[channel] = output_state
+        self.current_channel_enabled[channel] = output_state
         self._logger.message("{} Estado del canal {} fijado a {}".format(self._name, channel, on_off))
 
-rm = pv.ResourceManager()
-osc = Osciloscope(rm, "ASRL3:")
+rm = pv.ResourceManager("@py")
+fg = FunctionGenerator(rm, "1603553")
+osc = Osciloscope(rm, "C017")
+# osc.aquire_data("data")
