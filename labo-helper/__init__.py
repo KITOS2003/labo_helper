@@ -1,3 +1,4 @@
-from labo_helper import Osciloscopio
-from labo_helper import FunctionGenerator
-from labo_helper import InstrumentException
+from osciloscope import Osciloscope
+from function_generator import FunctionGenerator
+from utils import InstrumentException
+
